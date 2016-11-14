@@ -38,6 +38,7 @@ using std::queue;
 #include <mutex>
 #include <string>
 #include <assert.h>
+#include <malloc.h>
 #include "./CompilerFeature.h"
 #include "./Guard.h"
 
@@ -71,38 +72,42 @@ class LockFreeQueue {
   }
 
   void Push(const T& t) {
-    if (unlikely(front_offset_ - end_offset_ > capacity_ - 1)) {
+    if (unlikely(front_offset_ - end_offset_ +1 > capacity_ )) {
       LockGuard guard(mutex_);
-      if (front_offset_ - end_offset_ > capacity_ - 1) {
+      if (front_offset_ - end_offset_ + 1 > capacity_) {
         int cap = GetNextCap();
-        auto buf = unique_ptr<T[]>(new T[cap]);
-        std::cout<<"expand buffer size to "<<cap<<std::endl;
+        T* buff = static_cast<T*>(malloc(cap * sizeof(T)));
+        memset(buff, -1, cap * sizeof(T));
+        auto buf = unique_ptr<T[]>(buff);
         buffer_ = Migrate(std::move(buf));
-        capacity_ = cap;
         buffer_[front_offset_++] = t;
+        capacity_ = cap;
         return;
       }
     }
-
+    // ERROR!!!
+    // two thread will execute this statement concurrently, when seeing the front_offset_ both satisfy " front_offset_ - end_offset_ + 1 = capacity_".
+    // then the front_offset_ will be exceed the safe range, which leads to move the latter data after the last data to the first place
+    // so the solution is make this queue fixed size.
     int last_front = __sync_fetch_and_add(&front_offset_, 1);
     buffer_[last_front%capacity_] = t;
-
   }
   const T& Pop(){
     int last_end = __sync_fetch_and_add(&end_offset_, 1);
     return buffer_[last_end%capacity_];
   }
-  bool Empty() { return 0 == Size(); }
-  int64_t Size() { return front_offset_-end_offset_;}
+  inline bool Empty() { return 0 == Size(); }
+  inline int64_t Size() { return front_offset_-end_offset_;}
 
  private:
   void Init(int64_t size){
-    buffer_= unique_ptr<T[]>(new T[size]());
+    T* buf = static_cast<T*>(calloc(size, sizeof(T)));
+    buffer_= unique_ptr<T[]>(buf);
     capacity_ = size;
   }
 
   int64_t GetNextCap() {
-    int cap = expand_func_(capacity_);
+    int64_t cap = expand_func_(capacity_);
     assert(cap > 0);
     return cap;
   }
@@ -110,19 +115,21 @@ class LockFreeQueue {
   // migrate all data from old array buffer to new buffer,
   // reset end_offset_ and front_offset_
   unique_ptr<T[]> Migrate( unique_ptr<T[]>&& new_buf){
-    std::cout<<"migrate data "<<std::endl;
+    int old_end_offset = end_offset_;
     for (int i = 0; i < front_offset_-end_offset_; ++i)
-      new_buf[i]= std::move(buffer_[end_offset_%capacity_ + i ]);
+      new_buf[i]= std::move(buffer_[old_end_offset + i ]);
 
     end_offset_ = 0;
-    front_offset_ = front_offset_ - end_offset_;
+    front_offset_ = front_offset_ - old_end_offset;
     return std::move(new_buf);
   }
 
  private:
   int64_t capacity_;
-  uint64_t front_offset_;
-  uint64_t end_offset_;
+ public:
+  volatile int64_t front_offset_;   // the offset of the next data to store
+  volatile int64_t end_offset_;     // the offset of the last stored data
+ private:
   unique_ptr<T[]> buffer_;
   std::function<int64_t(int64_t)> expand_func_;
 

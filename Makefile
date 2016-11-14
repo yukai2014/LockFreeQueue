@@ -1,8 +1,8 @@
-CXXFLAGS =	-O2 -g -Wall -fmessage-length=0 -std=c++11
+CXXFLAGS =	-O2 -g -Wall -fmessage-length=0 -std=c++11 
 
 OBJS =		LockFreeQueueTest.o
 
-LIBS =
+LIBS =	-pthread
 
 TARGET =	LockFreeQueue
 
