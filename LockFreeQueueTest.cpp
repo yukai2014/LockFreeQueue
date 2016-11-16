@@ -190,7 +190,7 @@ int main() {
   cout<<"===================================="<<endl<<endl;
 
   number = 100;
-  {
+  { // failed in this case
     bool success = true;
 
     int thread_num = 5;
@@ -249,6 +249,7 @@ int main() {
 
   }
   cout<<"===================================="<<endl<<endl;
+
 
   return 0;
 }

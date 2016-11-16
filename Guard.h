@@ -29,6 +29,8 @@
 #ifndef LockFreeQueue_GUARD_H_
 #define LockFreeQueue_GUARD_H_
 
+#include <mutex>
+
 class LockGuard{
  public:
   LockGuard(std::mutex& mutex):mutex_(mutex){
