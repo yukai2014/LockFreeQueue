@@ -57,16 +57,22 @@ class FixSizeLockFreeQueue {
  public:
   FixSizeLockFreeQueue():FixSizeLockFreeQueue(DEFAULT_INIT_SIZE){}
   FixSizeLockFreeQueue(int64_t init_size)
-  :capacity_(-1), front_offset_(0),end_offset_(0),  buffer_(nullptr){
-    std::cout<<"initialize size is:"<<init_size<<std::endl;
-    assert(init_size > 0 && init_size < 10000000);
-    Init(init_size);
+  :capacity_(init_size), front_offset_(0),end_offset_(0),  buffer_(nullptr){
+//    std::cout<<"initialize size is:"<<init_size<<std::endl;
+    assert(capacity_ > 0);
+    T* buf = static_cast<T*>(malloc(capacity_ * sizeof(T)));
+    memset(buf, -1, sizeof(T) * capacity_);
+    buffer_= unique_ptr<T[]>(buf);
     assert(capacity_ > 0 && "invalid capacity of initialized queue");
+
+    memset(ids, 0, sizeof(ids));
+    memset(bids, 0, sizeof(bids));
   }
   ~FixSizeLockFreeQueue(){
     buffer_.reset();
   }
 
+  // return false if queue is full, otherwise true
   inline bool Push(const T& t) {
     while(true) {
       int64_t front = front_offset_;
@@ -80,12 +86,14 @@ class FixSizeLockFreeQueue {
     }
   }
 
+  // return false if queue is empty, otherwise true with moving data into t
   bool Pop(T& t){
     while (true) {
       int64_t end = end_offset_;
       if (end >= front_offset_) return false;
       if (end_offset_.compare_exchange_weak(end, end + 1)) {
         t = std::move(buffer_[end%capacity_]);
+//        memset(&buffer_[end%capacity_], -1, sizeof(T));
         return true;
       } else {
         continue;
@@ -96,21 +104,66 @@ class FixSizeLockFreeQueue {
   inline int64_t Size() { return front_offset_-end_offset_;}
 
  private:
-  void Init(int64_t size){
-    T* buf = static_cast<T*>(calloc(size, sizeof(T)));
-    buffer_= unique_ptr<T[]>(buf);
-    capacity_ = size;
-  }
-
- private:
-  int64_t capacity_;
+  const int64_t capacity_;
  public:
   atomic<int64_t> front_offset_;   // the offset of the next data to store
   atomic<int64_t> end_offset_;     // the offset of the last stored data
  private:
   unique_ptr<T[]> buffer_;
+
+  // FOR DEBUG
+ public:
+  int ids[100000];
+  bool bids[100000];
 };
 
+template<>
+inline bool FixSizeLockFreeQueue<int>::Push(const int& t) {
+  while(true) {
+    int64_t front = front_offset_;
+    if (front - end_offset_ + 1 > capacity_ ) return false;
+    if (front_offset_.compare_exchange_weak(front, front+1)){
+      buffer_[front%capacity_] = t;
+
+      /*// FOR DEBUG
+      assert(buffer_[front%capacity_] != -1);
+      if (bids[front%capacity_]) assert(false&&"must not be initialized");
+      bids[front%capacity_] = true;
+      if (ids[front%capacity_] == 0) {
+        ids[front%capacity_]= t;
+      } else {
+        std::cout<<"ids["<<front<<"] has value:"<<ids[front%capacity_]<<std::endl;
+      }*/
+
+      return true;
+    } else {
+      continue;
+    }
+  }
+}
+
+template<>
+bool FixSizeLockFreeQueue<int>::Pop(int& t){
+  while (true) {
+    int64_t end = end_offset_;
+    if (end >= front_offset_) return false;
+    if (end_offset_.compare_exchange_weak(end, end + 1)) {
+      t = buffer_[end%capacity_];
+
+      /*// FOR DEBUG
+      if (10000 == t) {
+        std::cout<<"got data whose value is 10000, while ids["<<end%capacity_<<"]:"<<ids[end%capacity_]<<std::endl;
+        std::cout<<"bids["<<end%capacity_<<"]:"<<bids[end%capacity_]<<std::endl;
+        std::cout<<pthread_self()<<", end:"<<end<<std::endl;
+//        assert(false);
+      }*/
+//      buffer_[end%capacity_] = -1;
+      return true;
+    } else {
+      continue;
+    }
+  }
+}
 
 
 #endif /* LockFreeQueue_FIXSIZELOCKFREEQUEUE_H_ */
