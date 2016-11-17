@@ -89,7 +89,7 @@ int main(){
     bool success = true;
     FixSizeLockFreeQueue<int> lf_queue(128);
     for(int i = 0; i < number; ++i) {
-      lf_queue.Push(i);
+      if (!lf_queue.Push(i)) {}
     }
 
     if (lf_queue.Empty() || lf_queue.Size() != number) success = false;
@@ -192,15 +192,20 @@ int main(){
 
     int *res= nullptr;
     for (int i = 0; i < number; ++i) {
-      if (!lf_queue.Pop(res) && i != (*res)){
-        cout<<"inconsistent value! expected value:"<<i<<", got value:"<<*res<<endl;
+      if (lf_queue.Pop(res)){
+        if ( i != (*res)){
+          cout<<"inconsistent value! expected value:"<<i<<", got value:"<<*res<<endl;
+          success = false;
+        }
+      } else {
+        cout<<"can't pop data"<<endl;
         success = false;
       }
     }
     PRINT_RESULT("queue storing pointer point to int type");
   }
 
-  number = 10000;
+  number = 1000;
   {
     bool success = true;
 
@@ -221,13 +226,12 @@ int main(){
       for (int th_num = 0; th_num< thread_num; ++th_num){
         (*td[th_num]).join();
       }
-      int* count = new int[number];
       int before_value = -1, after_value = before_value + thread_num;
-
+      int* count = new int[number];
       memset(count , before_value, sizeof(int) * number);
       //      cout<<"size of queue is:"<<lf_queue.Size()<<endl;
-      //      cout<<"front offset is: "<<lf_queue.front_offset_<<", end offset is: "<<lf_queue.end_offset_<<endl;
-      assert(lf_queue.Size() == thread_num* number && "wrong size after pushing data");
+//      cout<<"front offset is: "<<lf_queue.front_offset_<<", end offset is: "<<lf_queue.end_offset_<<", written offset is: "<<lf_queue.written_offset_<<endl;
+      assert(lf_queue.Size() == thread_num * number && "wrong size after pushing data");
       int res = -1;
       while(lf_queue.Pop(res)) {
         if (res >= number || res < 0) {
@@ -238,7 +242,6 @@ int main(){
           count[res]++;
         }
       }
-      //      cout<<"front offset is: "<<lf_queue.front_offset_<<", end offset is: "<<lf_queue.end_offset_<<endl;
       for (int i = 0; i < number; ++i) {
         if(count[i] != after_value) {
           cout<<"lost some data or duplicate some data, the "<<i<<"'s count is:"<<count[i]<<", expected value is:"<<after_value<<endl;
@@ -246,7 +249,10 @@ int main(){
         }
       }
 
-      if (!success) break;
+      if (!success){
+        cout<<"after poping, front offset is: "<<lf_queue.front_offset_<<", end offset is: "<<lf_queue.end_offset_<<", written offset is: "<<lf_queue.written_offset_<<endl;
+        break;
+      }
     }
     PRINT_RESULT_R("multi-thread input_then_pop_all", repeat_time);
   }
@@ -285,7 +291,8 @@ int main(){
       }
 
       for (int th_num = 0; th_num< thread_num; ++th_num) (*td[th_num]).join();
-      if (!lf_queue.Empty()) cout<<"front offset is: "<<lf_queue.front_offset_<<", end offset is: "<<lf_queue.end_offset_<<endl;
+      if (!lf_queue.Empty())
+        cout<<"front offset is: "<<lf_queue.front_offset_<<", end offset is: "<<lf_queue.end_offset_<<", written offset is: "<<lf_queue.written_offset_<<endl;
       assert(lf_queue.Empty());
 
       for (int i = 0; i < number; ++i) {
@@ -340,24 +347,26 @@ int main(){
           }
         });
       }
-
       for (int th_num = 0; th_num< input_thread_num; ++th_num) (*td1[th_num]).join();
       for (int th_num = 0; th_num< output_thread_num; ++th_num) (*td2[th_num]).join();
 
-      /*std::cout<<"checking bids..."<<std::endl;
+      std::cout<<"checking bids..."<<std::endl;
       for (int i = 0; i < init_cap; ++i){
         if (lf_queue.bids[i] != true){
           std::cout<<"front_offset lost "<<i<<std::endl;
           assert(false);
         }
-      }*/
+      }
 
-      if (!lf_queue.Empty()) cout<<"front offset is: "<<lf_queue.front_offset_<<", end offset is: "<<lf_queue.end_offset_<<endl;
+      if (!lf_queue.Empty()) {
+        cout<<"front offset is: "<<lf_queue.front_offset_<<", end offset is: "<<lf_queue.end_offset_<<", written offset is: "<<lf_queue.written_offset_<<endl;
+        cout<<"need to collect the rest of data"<<endl;
+      }
 
       { // collect the rest of data in case that consumer threads finished earlier than producer threads
         int res = -1;
         while(lf_queue.Pop(res)) {
-          if (res >= init_cap || res < 0) {
+          if (res >= number || res < 0) {
             cout<<"error value"<<endl;
             assert(false);
           } else {
@@ -402,16 +411,18 @@ int main(){
       for (int th_num = 0; th_num< thread_num; ++th_num){
         td1[th_num]= new thread([&lf_queue, number](){
           for(int i = 0; i < number; ++i) {
-            while (!lf_queue.Push(i));
+            while (!lf_queue.Push(i)){
+              usleep(1);
+            }
           };
         });
       }
       std::thread **td2 = static_cast<thread**>(malloc(sizeof(thread*) * thread_num));
       for (int th_num = 0; th_num< thread_num; ++th_num){
-        td2[th_num]= new thread([&lf_queue, &count, init_cap](){
+        td2[th_num]= new thread([&lf_queue, &count, number](){
           int res = -1;
           while(lf_queue.Pop(res)) {
-            if (res >= init_cap) {
+            if (res >= number || res < 0) {
               cout<<"error value"<<endl;
               assert(false);
             } else {
@@ -430,7 +441,7 @@ int main(){
 
       for (int i = 0; i < number; ++i) {
         if(count[i] != after_value) {
-          cout<<"lost some data or duplicate some data, the "<<i<<"'s count is:"<<count[i]<<endl;
+          cout<<"lost some data or duplicate some data, the "<<i<<"'s count is:"<<count[i]<<", expected value is:"<<after_value<<endl;
           success = false;
         }
       }
