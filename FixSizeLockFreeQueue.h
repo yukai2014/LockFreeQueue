@@ -47,6 +47,8 @@ using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 
+#define CAS(ptr , oldvalue , newvalue) __sync_bool_compare_and_swap(&ptr , oldvalue , newvalue)
+
 /*****************************************
 
 queue like this:
@@ -59,7 +61,7 @@ class FixSizeLockFreeQueue {
  public:
   FixSizeLockFreeQueue():FixSizeLockFreeQueue(DEFAULT_INIT_SIZE){}
   FixSizeLockFreeQueue(int64_t init_size)
-  :capacity_(init_size), front_offset_(0),end_offset_(0), written_offset_(0), buffer_(nullptr){
+  :capacity_(init_size), front_offset_(0),end_offset_(0), written_offset_(0), read_offset_(0), buffer_(nullptr){
 //    std::cout<<"initialize size is:"<<init_size<<std::endl;
     assert(capacity_ > 0 && "invalid capacity of initialized queue");
     T* buf = static_cast<T*>(malloc(capacity_ * sizeof(T)));
@@ -68,6 +70,11 @@ class FixSizeLockFreeQueue {
 
     memset(ids, 0, sizeof(ids));
     memset((bool*)bids, 0, sizeof(bids));
+    for (int i = 0; i < sizeof(bids); ++i) {
+      if (bids[i]) {
+        assert(false);
+      }
+    }
   }
   ~FixSizeLockFreeQueue(){
     buffer_.reset();
@@ -78,10 +85,10 @@ class FixSizeLockFreeQueue {
     while(true) {
       int64_t front = front_offset_;
       if (front - end_offset_ + 1 > capacity_ ) return false;
-      if (front_offset_.compare_exchange_weak(front, front+1)){
+      if (CAS(front_offset_,front, front+1)){
         buffer_[front%capacity_] = t;
 
-        while(!written_offset_.compare_exchange_weak(front, front + 1));
+        while(!CAS(written_offset_,front, front + 1));
         return true;
       }
     }
@@ -93,7 +100,7 @@ class FixSizeLockFreeQueue {
       int64_t end = end_offset_;
       if (end >= front_offset_) return false;
       if (end >= written_offset_) continue;
-      if (end_offset_.compare_exchange_weak(end, end + 1)) {
+      if (CAS(end_offset_, end, end + 1)) {
         t = std::move(buffer_[end%capacity_]);
         return true;
       } else {
@@ -107,9 +114,10 @@ class FixSizeLockFreeQueue {
  private:
   const int64_t capacity_;
  public:
-  atomic<int64_t> front_offset_;   // the offset of the next data to store
-  atomic<int64_t> end_offset_;     // the offset of the last stored data
-  atomic<int64_t> written_offset_;  // the offset of last data stored
+  int64_t front_offset_;   // the offset of the next data to store
+  int64_t end_offset_;     // the offset of the next stored data to read
+  int64_t written_offset_;  // the offset of last data stored
+  int64_t read_offset_;
  private:
   unique_ptr<T[]> buffer_;
 
@@ -120,7 +128,7 @@ class FixSizeLockFreeQueue {
   volatile bool bids[100000];
 };
 
-/*template<>
+template<>
 inline bool FixSizeLockFreeQueue<int>::Push(const int& t) {
   int64_t front;
   do {
@@ -129,57 +137,90 @@ inline bool FixSizeLockFreeQueue<int>::Push(const int& t) {
     if (front - end_offset_ + 1 > capacity_ )
       return false;
 
-  } while (!front_offset_.compare_exchange_weak(front, front+1));
+//    if (front - read_offset_ + 1 > capacity_) continue;
+
+  } while (!CAS(front_offset_,front, front+1));
 
   buffer_[front%capacity_] = t;
   bids[front%capacity_] = true;
   ids[front%capacity_] = t;
 
-  while(!written_offset_.compare_exchange_weak(front, front + 1)){sched_yield();}
+  while(!CAS(written_offset_,front, front + 1)) {
+    sched_yield();
+  }
   return true;
-}*/
+}
 
+/*
 template<>
 inline bool FixSizeLockFreeQueue<int>::Push(const int& t) {
+  int64_t front, end;
   while(true) {
-    int64_t front = front_offset_;
-    if (front - end_offset_ + 1 > capacity_ ) return false;
+    front = front_offset_;
+    end = end_offset_;
+    if (front - end + 1 > capacity_ ) return false;
     if (front_offset_.compare_exchange_weak(front, front+1)){
       buffer_[front%capacity_] = t;
 
       {// FOR DEBUG
-        if (bids[front%capacity_]) {
-          std::cout<<pthread_self()<<", end:"<<end_offset_<<", front:"<<front
+        if (bids[front]) {
+          std::cout<<pthread_self()<<", end:"<<end_offset_<<", cached front:"<<front<<", front:"<<front_offset_
                            <<", written:"<<written_offset_<<std::endl;
           assert(false&&"must not be initialized");
         }
-        bids[front%capacity_] = true;
-        ids[front%capacity_] = t;
+        bids[front] = true;
+        ids[front] = t;
       }
 
-      while(!written_offset_.compare_exchange_weak(front, front + 1));
+      while(!written_offset_.compare_exchange_weak(front, front + 1)){
+//        sched_yield();
+      }
       return true;
     }
   }
-}
+}*/
 
 template<>
 bool FixSizeLockFreeQueue<int>::Pop(int& t){
   while (true) {
     int64_t end = end_offset_;
-    if (end >= front_offset_) return false;
+    if (end >= front_offset_) {
+//      std::cout<<"Pop return false. cached end_offset_ is:"<<end
+//                <<", front:"<<front_offset_<<std::endl;
+      return false;
+    }
     if (end >= written_offset_) continue;
-    if (end_offset_.compare_exchange_weak(end, end + 1)) {
-      t = buffer_[end%capacity_];
+
+    /*
+     * must get data before CAS operation,
+     * otherwise can't guarantee the data to read is rewritten by new push()
+     */
+    t = buffer_[end%capacity_];
+
+    if (CAS(end_offset_, end, end + 1)) {
+
+//      bids[end%capacity_] = false;
+//      ids[end%capacity_] = -3;
+
+      /*
+       * need not indicate the offset of been read data, if get data before CAS(end_offset_)
+       */
+//      while(!CAS(read_offset_, end, end+1)){
+//        sched_yield();
+//      }
 
       // FOR DEBUG
-      if (-1 == t) {
-        std::cout<<"got data whose value is -1, while ids["<<end%capacity_<<"]:"<<ids[end%capacity_]<<std::endl;
+      if (unlikely(-2 == buffer_[end%capacity_])) {
+        std::cout<<"got data whose value is -2, while ids["<<end%capacity_<<"]:"
+                 <<ids[end%capacity_]<<std::endl;
         std::cout<<"bids["<<end%capacity_<<"]:"<<bids[end%capacity_]<<std::endl;
         std::cout<<pthread_self()<<", end:"<<end<<", front:"<<front_offset_
-                 <<", written:"<<written_offset_<<std::endl;
+                 <<", written:"<<written_offset_<<", capacity:"<<capacity_<<std::endl;
 //        assert(false);
       }
+
+
+//      buffer_[end%capacity_] = -2;
       return true;
     } else {
       continue;
