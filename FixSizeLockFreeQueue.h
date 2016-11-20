@@ -88,7 +88,9 @@ class FixSizeLockFreeQueue {
       if (CAS(front_offset_,front, front+1)){
         buffer_[front%capacity_] = t;
 
-        while(!CAS(written_offset_,front, front + 1));
+        while(!CAS(written_offset_,front, front + 1)) {
+          sched_yield();
+        }
         return true;
       }
     }
@@ -99,12 +101,15 @@ class FixSizeLockFreeQueue {
     while (true) {
       int64_t end = end_offset_;
       if (end >= front_offset_) return false;
-      if (end >= written_offset_) continue;
+      if (end >= written_offset_) {sched_yield(); continue;};
+
+      /*
+       * must get data before CAS operation,
+       * otherwise can't guarantee the data to read is rewritten by new push()
+       */
+      t = buffer_[end%capacity_];
       if (CAS(end_offset_, end, end + 1)) {
-        t = std::move(buffer_[end%capacity_]);
         return true;
-      } else {
-        continue;
       }
     }
   }
@@ -127,7 +132,7 @@ class FixSizeLockFreeQueue {
   bool nothing[100000];
   volatile bool bids[100000];
 };
-
+/*
 template<>
 inline bool FixSizeLockFreeQueue<int>::Push(const int& t) {
   int64_t front;
@@ -150,6 +155,7 @@ inline bool FixSizeLockFreeQueue<int>::Push(const int& t) {
   }
   return true;
 }
+*/
 
 /*
 template<>
@@ -179,6 +185,7 @@ inline bool FixSizeLockFreeQueue<int>::Push(const int& t) {
     }
   }
 }*/
+/*
 
 template<>
 bool FixSizeLockFreeQueue<int>::Pop(int& t){
@@ -191,10 +198,10 @@ bool FixSizeLockFreeQueue<int>::Pop(int& t){
     }
     if (end >= written_offset_) continue;
 
-    /*
+
      * must get data before CAS operation,
      * otherwise can't guarantee the data to read is rewritten by new push()
-     */
+
     t = buffer_[end%capacity_];
 
     if (CAS(end_offset_, end, end + 1)) {
@@ -202,9 +209,9 @@ bool FixSizeLockFreeQueue<int>::Pop(int& t){
 //      bids[end%capacity_] = false;
 //      ids[end%capacity_] = -3;
 
-      /*
+
        * need not indicate the offset of been read data, if get data before CAS(end_offset_)
-       */
+
 //      while(!CAS(read_offset_, end, end+1)){
 //        sched_yield();
 //      }
@@ -227,6 +234,7 @@ bool FixSizeLockFreeQueue<int>::Pop(int& t){
     }
   }
 }
+*/
 
 
 #endif /* LockFreeQueue_FIXSIZELOCKFREEQUEUE_H_ */

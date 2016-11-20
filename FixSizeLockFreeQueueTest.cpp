@@ -598,6 +598,134 @@ int main(){
     PRINT_RESULT_R("multi-thread_loop_pushing_and_poping_into_smaller_queue", repeat_time);
   }
 
+  {
+    // case 10
+     bool success = true;
+
+     int thread_num = 5;
+     int init_cap = thread_num * number / 2;
+
+     for (int t = 0; t < repeat_time; ++t) {
+       int before_value = -1, after_value = before_value + thread_num, popped_num = 0;
+       int* count = new int[number];
+       memset(count , before_value, sizeof(int) * number);
+
+       FixSizeLockFreeQueue<long> lf_queue(init_cap);
+
+       std::thread **td1 = static_cast<thread**>(malloc(sizeof(thread*) * thread_num));
+       for (int th_num = 0; th_num< thread_num; ++th_num){
+         td1[th_num]= new thread([&lf_queue, number](){
+           for(int i = 0; i < number; ++i) {
+             while (!lf_queue.Push(i)){
+               usleep(1);
+             }
+           };
+         });
+       }
+       std::thread **td2 = static_cast<thread**>(malloc(sizeof(thread*) * thread_num));
+       for (int th_num = 0; th_num< thread_num; ++th_num){
+         td2[th_num]= new thread([&lf_queue, &count, &popped_num, thread_num, number](){
+           while(popped_num < number*thread_num){
+             long res = -1;
+             while(lf_queue.Pop(res)) {
+               if (res >= number || res < 0) {
+                 cout<<"error value:"<<res<<endl;
+                 //              assert(false);
+               } else {
+                 __sync_fetch_and_add(&count[res], 1);
+                 __sync_fetch_and_add(&popped_num, 1);
+               }
+             }
+             usleep(1);
+           }
+         });
+       }
+
+       for (int th_num = 0; th_num< thread_num; ++th_num) (*td1[th_num]).join();
+       for (int th_num = 0; th_num< thread_num; ++th_num) (*td2[th_num]).join();
+       delete[] td1;
+       delete[] td2;
+       assert(lf_queue.Empty());
+
+       for (int i = 0; i < number; ++i) {
+         if(count[i] != after_value) {
+           cout<<"lost some data or duplicate some data, the "<<i<<"'s count is:"<<count[i]<<", expected value is:"<<after_value<<endl;
+           success = false;
+         }
+       }
+
+       if (!success) {
+         cout<<"ERROR: front offset is: "<<lf_queue.front_offset_<<", end offset is: "<<lf_queue.end_offset_<<endl;
+         break;
+       }
+     }
+     PRINT_RESULT_R("multi-thread_loop_pushing_and_poping_into_smaller_queue_with_long_type", repeat_time);
+  }
+
+  {
+     bool success = true;
+
+     int thread_num = 5;
+     int init_cap = thread_num * number / 2;
+
+     for (int t = 0; t < repeat_time; ++t) {
+       int before_value = -1, after_value = before_value + thread_num, popped_num = 0;
+       int* count = new int[number];
+       memset(count , before_value, sizeof(int) * number);
+
+       FixSizeLockFreeQueue<int*> lf_queue(init_cap);
+
+       std::thread **td1 = static_cast<thread**>(malloc(sizeof(thread*) * thread_num));
+       for (int th_num = 0; th_num< thread_num; ++th_num){
+         td1[th_num]= new thread([&lf_queue, number](){
+           for(int i = 0; i < number; ++i) {
+             while (!lf_queue.Push(new int(i))){
+               usleep(1);
+             }
+           };
+         });
+       }
+       std::thread **td2 = static_cast<thread**>(malloc(sizeof(thread*) * thread_num));
+       for (int th_num = 0; th_num< thread_num; ++th_num){
+         td2[th_num]= new thread([&lf_queue, &count, &popped_num, thread_num, number](){
+           while(popped_num < number*thread_num){
+             int* res = nullptr;
+             while(lf_queue.Pop(res)) {
+               if (*res >= number || *res < 0) {
+                 cout<<"error value:"<<*res<<endl;
+                 //              assert(false);
+               } else {
+                 __sync_fetch_and_add(&count[*res], 1);
+                 __sync_fetch_and_add(&popped_num, 1);
+               }
+             }
+             usleep(1);
+           }
+         });
+       }
+
+       for (int th_num = 0; th_num< thread_num; ++th_num) (*td1[th_num]).join();
+       for (int th_num = 0; th_num< thread_num; ++th_num) (*td2[th_num]).join();
+       delete[] td1;
+       delete[] td2;
+       assert(lf_queue.Empty());
+
+       for (int i = 0; i < number; ++i) {
+         if(count[i] != after_value) {
+           cout<<"lost some data or duplicate some data, the "<<i<<"'s count is:"<<count[i]<<", expected value is:"<<after_value<<endl;
+           success = false;
+         }
+       }
+
+       if (!success) {
+         cout<<"ERROR: front offset is: "<<lf_queue.front_offset_<<", end offset is: "<<lf_queue.end_offset_<<endl;
+         break;
+       }
+     }
+     PRINT_RESULT_R("multi-thread_loop_pushing_and_poping_into_smaller_queue_with_int_pointer_type", repeat_time);
+
+  }
+
   cout<<"tested "<<case_id<<" cases"<<endl;
   if (failed_case_num == 0) {
     cout<<GREEN<<"ALL TEST CASES PASSED"<<BLACK<<endl;
