@@ -35,7 +35,7 @@
  */
 class Timer {
  public:
-  static double GetCurrentMs() {
+  static inline double GetCurrentMs() {
     timeval t_start;
     gettimeofday(&t_start, NULL);
     return t_start.tv_sec * 1000 + 1.0 * t_start.tv_usec / 1000;
@@ -45,7 +45,7 @@ class Timer {
    * @param start: the start time
    * @return : the elapsed time(ms) from start, accurate to us
    */
-  static double GetElapsedTime(double start) {
+  static inline double GetElapsedTime(double start) {
     timeval t_end;
     gettimeofday(&t_end, NULL);
     return (t_end.tv_sec * 1000 + 1.0 * t_end.tv_usec / 1000) - start;

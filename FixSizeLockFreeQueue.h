@@ -85,7 +85,7 @@ class FixSizeLockFreeQueue {
         buffer_[front%capacity_] = t;
 
         while(!CAS(written_offset_,front, front + 1)) {
-          sched_yield();
+          sched_yield();    // great performance promotion when producers are more the physical cores
         }
         return true;
       }
@@ -107,6 +107,7 @@ class FixSizeLockFreeQueue {
       if (CAS(end_offset_, end, end + 1)) {
         return true;
       }
+      sched_yield();
     }
   }
 
