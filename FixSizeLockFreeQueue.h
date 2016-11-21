@@ -67,7 +67,7 @@ class FixSizeLockFreeQueue {
   :capacity_(init_size), front_offset_(0),end_offset_(0), written_offset_(0), buffer_(nullptr){
 
     assert(capacity_ > 0 && "invalid capacity of initialized queue");
-    T* buf = static_cast<T*>(malloc(capacity_ * sizeof(T)));
+    T* buf = new T[capacity_];
     memset(buf, -1, sizeof(T) * capacity_);
     buffer_= unique_ptr<T[]>(buf);
   }
