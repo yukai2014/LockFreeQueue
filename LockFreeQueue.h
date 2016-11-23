@@ -73,7 +73,7 @@ class LockFreeQueue {
 
   void Push(const T& t) {
     if (unlikely(front_offset_ - end_offset_ +1 > capacity_ )) {
-      LockGuard guard(mutex_);
+      MutexLockGuard guard(mutex_);
       if (front_offset_ - end_offset_ + 1 > capacity_) {
         int cap = GetNextCap();
         T* buff = static_cast<T*>(malloc(cap * sizeof(T)));
