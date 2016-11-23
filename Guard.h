@@ -30,10 +30,31 @@
 #define LockFreeQueue_GUARD_H_
 
 #include <mutex>
+#include <pthread.h>
 
+
+class SpinLock{
+ public:
+  SpinLock(){
+    pthread_spin_init(&mutex_, 0);
+  }
+  ~SpinLock(){
+    pthread_spin_destroy(&mutex_);
+  }
+  void lock() {
+    pthread_spin_lock(&mutex_);
+  }
+  void unlock() {
+    pthread_spin_unlock(&mutex_);
+  }
+ private:
+  pthread_spinlock_t mutex_;
+};
+
+template <typename T>
 class LockGuard{
  public:
-  LockGuard(std::mutex& mutex):mutex_(mutex){
+  LockGuard(T& mutex):mutex_(mutex){
     mutex_.lock();
   }
   ~LockGuard(){
@@ -43,8 +64,10 @@ class LockGuard{
   LockGuard(const LockGuard& other);
   void operator=(const LockGuard& other);
  private:
-  std::mutex& mutex_;
+  T& mutex_;
 };
 
+using MutexLockGuard = LockGuard<std::mutex>;
+using SpinLockGuard = LockGuard<SpinLock>;
 
 #endif /* LockFreeQueue_GUARD_H_ */

@@ -35,6 +35,7 @@
 #include <queue>
 
 #include "./FixSizeLockFreeQueue.h"
+#include "./Guard.h"
 #include "./Timer.h"
 
 using std::cout;
@@ -46,9 +47,15 @@ const long operation_time = 100*1000;
 const int skip_time = 5;
 const int repeat_time = 100;
 
+// #define MUTEX
+
+#ifdef MUTEX
 std::mutex queue_mutex;
-std::mutex push_mutex;
-std::mutex pop_mutex;
+using MyLockGurad = MutexLockGuard;
+#else
+SpinLock queue_mutex;
+using MyLockGurad = SpinLockGuard;
+#endif
 
 double LockFreeQueuePerfTest(const int capacity, const long operations,const  int producers, const int consumers) {
   int popped_num= 0;
@@ -98,7 +105,7 @@ double QueuePerfTest(const int capacity, const long operations,const  int produc
   for (int th_num = 0; th_num< producers; ++th_num){
     td1[th_num]= new thread([&queue, operations](){
       for(int i = 0; i < operations; ++i) {
-        LockGuard guard(queue_mutex);
+        MyLockGurad guard(queue_mutex);
         queue.push(i);
       };
     });
@@ -109,7 +116,7 @@ double QueuePerfTest(const int capacity, const long operations,const  int produc
       int res = -1;
       while(popped_num < operations*producers){
         if (!queue.empty()) {
-          LockGuard guard(queue_mutex);
+          MyLockGurad guard(queue_mutex);
           if (!queue.empty()) {
             res = queue.front();
             queue.pop();
@@ -160,16 +167,45 @@ void PerfTest(int capacity, long operations, int producers, int consumers) {
 int main() {
   PerfTest(10000, operation_time, 1, 1);
   PerfTest(10000, operation_time, 1, 2);
+  PerfTest(10000, operation_time, 1, 3);
   PerfTest(10000, operation_time, 1, 4);
+  PerfTest(10000, operation_time, 1, 5);
   PerfTest(10000, operation_time, 1, 6);
+  PerfTest(10000, operation_time, 1, 7);
+  PerfTest(10000, operation_time, 1, 8);
+  PerfTest(10000, operation_time, 1, 9);
+  PerfTest(10000, operation_time, 1, 10);
+
   PerfTest(10000, operation_time, 2, 1);
   PerfTest(10000, operation_time, 2, 2);
+  PerfTest(10000, operation_time, 2, 3);
   PerfTest(10000, operation_time, 2, 4);
+  PerfTest(10000, operation_time, 2, 5);
   PerfTest(10000, operation_time, 2, 6);
+  PerfTest(10000, operation_time, 2, 7);
+  PerfTest(10000, operation_time, 2, 8);
+
+  PerfTest(10000, operation_time, 3, 1);
+  PerfTest(10000, operation_time, 3, 2);
+  PerfTest(10000, operation_time, 3, 3);
+  PerfTest(10000, operation_time, 3, 4);
+  PerfTest(10000, operation_time, 3, 5);
+  PerfTest(10000, operation_time, 3, 6);
+
   PerfTest(10000, operation_time, 4, 1);
   PerfTest(10000, operation_time, 4, 2);
+  PerfTest(10000, operation_time, 4, 3);
   PerfTest(10000, operation_time, 4, 4);
+  PerfTest(10000, operation_time, 4, 5);
   PerfTest(10000, operation_time, 4, 6);
+
+  PerfTest(10000, operation_time, 5, 1);
+  PerfTest(10000, operation_time, 5, 2);
+  PerfTest(10000, operation_time, 5, 3);
+  PerfTest(10000, operation_time, 5, 4);
+  PerfTest(10000, operation_time, 5, 5);
+  PerfTest(10000, operation_time, 5, 6);
+
   PerfTest(10000, operation_time, 6, 1);
   PerfTest(10000, operation_time, 6, 2);
   PerfTest(10000, operation_time, 6, 4);
