@@ -54,17 +54,16 @@ using std::unique_ptr;
 queue like this:
    end -> ================= -> front
 
-*****************************************/
+ *****************************************/
 
 template<typename T>
 class FixSizeLockFreeQueue {
+ public:
   const static int64_t DEFAULT_INIT_SIZE = 128;
 
  public:
-  FixSizeLockFreeQueue():FixSizeLockFreeQueue(DEFAULT_INIT_SIZE){}
-
-  FixSizeLockFreeQueue(int64_t init_size)
-  :capacity_(init_size), front_offset_(0),end_offset_(0), written_offset_(0), buffer_(nullptr){
+  FixSizeLockFreeQueue(int64_t init_size = DEFAULT_INIT_SIZE)
+ :capacity_(init_size), front_offset_(0),end_offset_(0), written_offset_(0), buffer_(nullptr){
 
     assert(capacity_ > 0 && "invalid capacity of initialized queue");
     T* buf = new T[capacity_];
@@ -92,6 +91,7 @@ class FixSizeLockFreeQueue {
     }
   }
 
+
   /* return false if queue is empty, otherwise true with moving data into t */
   bool Pop(T& t){
     while (true) {
@@ -117,13 +117,46 @@ class FixSizeLockFreeQueue {
   inline const int64_t end() const {return end_offset_;}
   inline const int64_t written_off() const { return written_offset_;}
 
- private:
+ protected:
   const int64_t capacity_;
   int64_t front_offset_;   // the offset of the next data to store
   int64_t end_offset_;     // the offset of the next stored data to read
   int64_t written_offset_;  // the offset of last data stored
   unique_ptr<T[]> buffer_;
 
+};
+
+template<typename T>
+class SingleProducerQueue : public FixSizeLockFreeQueue<T> {
+  using LFQueue = FixSizeLockFreeQueue<T>;
+  /* return false if queue is full, otherwise true */
+ public:
+  SingleProducerQueue(int64_t init_size = LFQueue::DEFAULT_INIT_SIZE) : FixSizeLockFreeQueue<T>(init_size){}
+
+  inline bool Push(const T& t) {
+    if (LFQueue::front_offset_ - LFQueue::end_offset_ + 1 > LFQueue::capacity_ ) return false;
+
+    int front = __sync_fetch_and_add(&(LFQueue::front_offset_), 1);
+    LFQueue::buffer_[front%LFQueue::capacity_] = t;
+    return true;
+  }
+
+  /* return false if queue is empty, otherwise true with moving data into t */
+  bool Pop(T& t){
+    while (true) {
+      int64_t end = LFQueue::end_offset_;
+      if (end >= LFQueue::front_offset_) return false;
+      /*
+       * must get data before CAS operation,
+       * otherwise can't guarantee the data to read is rewritten by new push()
+       */
+      t = LFQueue::buffer_[end%LFQueue::capacity_];
+      if (CAS((LFQueue::end_offset_), end, end + 1)) {
+        return true;
+      }
+      sched_yield();
+    }
+  }
 };
 
 #endif /* LockFreeQueue_FIXSIZELOCKFREEQUEUE_H_ */

@@ -96,6 +96,45 @@ double LockFreeQueuePerfTest(const int capacity, const long operations,const  in
   return res;
 }
 
+double SingleProducerQueuePerfTest(const int capacity, const long operations,const  int producers, const int consumers) {
+  int popped_num= 0;
+  SingleProducerQueue<int> lf_queue(capacity);
+
+  double current = Timer::GetCurrentMs(), res;
+
+  std::thread **td1 = new thread*[producers];
+  for (int th_num = 0; th_num< producers; ++th_num){
+    td1[th_num]= new thread([&lf_queue, operations](){
+      for(int i = 0; i < operations; ++i) {
+        while (!lf_queue.Push(i)){
+          usleep(1);
+        }
+      };
+    });
+  }
+  std::thread **td2 = new thread*[consumers];
+  for (int th_num = 0; th_num< consumers; ++th_num){
+    td2[th_num]= new thread([&lf_queue, &popped_num, producers, operations](){
+      int res = -1;
+      while(popped_num < operations*producers){
+        while (lf_queue.Pop(res)) {
+          __sync_fetch_and_add(&popped_num, 1);
+
+        }
+        usleep(1);
+      }
+    });
+  }
+  for (int th_num = 0; th_num< producers; ++th_num) { (*td1[th_num]).join(); delete td1[th_num]; }
+  for (int th_num = 0; th_num< consumers; ++th_num) { (*td2[th_num]).join(); delete td2[th_num]; }
+
+  res = Timer::GetElapsedTime(current);
+
+  delete[] td1;
+  delete[] td2;
+  return res;
+}
+
 double QueuePerfTest(const int capacity, const long operations,const  int producers, const int consumers) {
   int popped_num= 0;
   queue<int> queue;
@@ -113,7 +152,7 @@ double QueuePerfTest(const int capacity, const long operations,const  int produc
   std::thread **td2 = new thread*[consumers];
   for (int th_num = 0; th_num< consumers; ++th_num){
     td2[th_num]= new thread([&queue, &popped_num, producers, operations](){
-      int res = -1;
+      int res;
       while(popped_num < operations*producers){
         if (!queue.empty()) {
           MyLockGurad guard(queue_mutex);
@@ -139,10 +178,62 @@ double QueuePerfTest(const int capacity, const long operations,const  int produc
 }
 
 
+double OnlyNewDeletePerfTest(const int capacity, const long operations,const  int producers, const int consumers) {
+  int popped_num= 0, pushed_num = 0;
+  int** queue = new int* [operations * producers];
+  memset(queue, 0, operations * producers);
+
+  double current = Timer::GetCurrentMs(), res;
+  std::thread **td1 = new thread*[producers];
+  for (int th_num = 0; th_num< producers; ++th_num){
+    td1[th_num]= new thread([&queue, &pushed_num, operations](){
+      for(int i = 0; i < operations; ++i) {
+        int index = __sync_fetch_and_add(&pushed_num, 1);
+        queue[index] = new int(i);
+      };
+    });
+  }
+  std::thread **td2 = new thread*[consumers];
+  for (int th_num = 0; th_num< consumers; ++th_num){
+    td2[th_num]= new thread([&queue, &popped_num, &pushed_num, producers, operations](){
+      while(popped_num < operations*producers - 10){
+        if (popped_num < pushed_num-10 ){
+          int index = __sync_fetch_and_add(&popped_num, 1);
+          if (queue[index]) {
+            delete queue[index];
+            queue[index] = nullptr;
+          }
+        } else {
+          sched_yield();
+        }
+      }
+    });
+  }
+  for (int th_num = 0; th_num< producers; ++th_num) { (*td1[th_num]).join(); delete td1[th_num]; }
+  for (int th_num = 0; th_num< consumers; ++th_num) { (*td2[th_num]).join(); delete td2[th_num]; }
+
+  res = Timer::GetElapsedTime(current);
+
+  delete[] queue;
+  delete[] td1;
+  delete[] td2;
+  return res;
+}
+
+
 void PerfTest(int capacity, long operations, int producers, int consumers) {
 
   cout<<"with params: capacity-"<<capacity<<", operation time-"<<operations<<", producers num-"<<producers<<", consumer num-"<<consumers<<endl;
-  double sum = 0.0;
+  double   sum = 0.0;
+  for (int i = 0; i < skip_time; ++i) {
+    QueuePerfTest(capacity, operations, producers, consumers);
+  }
+  for (int i = 0; i < repeat_time; ++i) {
+    sum += QueuePerfTest(capacity, operations, producers, consumers);
+  }
+  cout<<"STLQueueWithLock: "<<sum<<endl;
+
+  sum = 0.0;
   for (int i = 0; i < skip_time; ++i) {
     LockFreeQueuePerfTest(capacity, operations, producers, consumers);
   }
@@ -151,14 +242,26 @@ void PerfTest(int capacity, long operations, int producers, int consumers) {
   }
   cout<<"LockFreeQueue: "<<sum<<endl;
 
+  if (producers == 1) {
+    sum = 0.0;
+    for (int i = 0; i < skip_time; ++i) {
+      SingleProducerQueuePerfTest(capacity, operations, producers, consumers);
+    }
+    for (int i = 0; i < repeat_time; ++i) {
+      sum += SingleProducerQueuePerfTest(capacity, operations, producers, consumers);
+    }
+    cout<<"SingleProducerQueue: "<<sum<<endl;
+  }
+
+
   sum = 0.0;
   for (int i = 0; i < skip_time; ++i) {
-    QueuePerfTest(capacity, operations, producers, consumers);
+    OnlyNewDeletePerfTest(capacity, operations, producers, consumers);
   }
   for (int i = 0; i < repeat_time; ++i) {
-    sum += QueuePerfTest(capacity, operations, producers, consumers);
+    sum += OnlyNewDeletePerfTest(capacity, operations, producers, consumers);
   }
-  cout<<"STLQueueWithLock: "<<sum<<endl;
+  cout<<"only new and delete: "<<sum<<endl;
   cout<<"-----------------------------------------------------"<<endl;
 
 }

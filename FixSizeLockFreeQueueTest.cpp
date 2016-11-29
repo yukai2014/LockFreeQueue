@@ -80,6 +80,7 @@ int main(){
   int repeat_time = 1000;
   int number = 10000;
 
+  // FixSizeLockFreeQueue Test Suit
   {
     bool success = true;
     FixSizeLockFreeQueue<int> lf_queue(128);
@@ -672,6 +673,390 @@ int main(){
     PRINT_RESULT_R("multi-thread_loop_pushing_and_poping_into_smaller_queue_with_int_pointer_type", repeat_time);
 
   }
+
+  // SingleProducerQueue Test Suit
+  {
+      bool success = true;
+      SingleProducerQueue<int> lf_queue(128);
+      if (!lf_queue.Empty() || lf_queue.Size() != 0) success = false;
+      PRINT_RESULT("get_size_of_empty_queue");
+    }
+
+    number = 100;
+    {
+      bool success = true;
+      SingleProducerQueue<int> lf_queue(128);
+      for(int i = 0; i < number; ++i) {
+        if (!lf_queue.Push(i)) {}
+      }
+
+      if (lf_queue.Empty() || lf_queue.Size() != number) success = false;
+      PRINT_RESULT( "get_queue_size_after_pushing_data");
+    }
+
+    number= 100;
+    {
+      bool success = true;
+      SingleProducerQueue<int> lf_queue(101);
+      for(int i = 0; i < number; ++i) {
+        lf_queue.Push(i);
+      }
+
+      int res = -1;
+      for (int i = 0; i < number; ++i) {
+        if (!lf_queue.Pop(res) && i != res){
+          cout<<"inconsistent value! expected value:"<<i<<", got value:"<<res<<endl;
+          success = false;
+        }
+      }
+      PRINT_RESULT( "push_less_data_than_init_size");
+    }
+
+    number = 121;
+    {
+      bool success = true;
+      int init_size = 120;
+      SingleProducerQueue<int> lf_queue(init_size);
+      for(int i = 0; i < init_size; ++i) {
+        lf_queue.Push(i);
+      }
+
+      if (lf_queue.Push(init_size+1)) assert(false && "should return false");
+
+      int res= -1;
+      for (int i = 0; i < init_size; ++i) {
+        if (!lf_queue.Pop(res) && i != res){
+          cout<<"inconsistent value! expected value:"<<i<<", got value:"<<res<<endl;
+          success = false;
+        }
+      }
+      PRINT_RESULT("push_more_data_than_init_size");
+    }
+
+    number = 260;
+    {
+      bool success = true;
+      SingleProducerQueue<int> lf_queue(260);
+      for(int i = 0; i < number; ++i) {
+        lf_queue.Push(i);
+      }
+
+      int res= -1;
+      for (int i = 0; i < number; ++i) {
+        if (!lf_queue.Pop(res) && i != res){
+          cout<<"inconsistent value! expected value:"<<i<<", got value:"<<res<<endl;
+          success = false;
+        }
+      }
+      PRINT_RESULT("push_same_size_of_data_with_init_size");
+    }
+
+    number = 100;
+    {
+      bool success = true;
+      SingleProducerQueue<int> lf_queue;
+      for(int i = 0; i < number; ++i) {
+        lf_queue.Push(i);
+      }
+
+      int res= -1;
+      for (int i = 0; i < number; ++i) {
+        if (!lf_queue.Pop(res) && i != res){
+          cout<<"inconsistent value! expected value:"<<i<<", got value:"<<res<<endl;
+          success = false;
+        }
+      }
+
+      for(int i = 0; i < number; ++i) {
+        lf_queue.Push(i);
+      }
+
+      for (int i = 0; i < number; ++i) {
+        if (!lf_queue.Pop(res) && i != res){
+          cout<<"inconsistent value! expected value:"<<i<<", got value:"<<res<<endl;
+          success = false;
+        }
+      }
+      PRINT_RESULT("push_and_pop_less_data_than_init_size_twice");
+    }
+
+    number = 2500;
+    {
+      bool success = true;
+      SingleProducerQueue<int*> lf_queue(2500);
+      for(int i = 0; i < number; ++i) {
+        lf_queue.Push(new int(i));
+      }
+
+      int *res= nullptr;
+      for (int i = 0; i < number; ++i) {
+        if (lf_queue.Pop(res)){
+          if ( i != (*res)){
+            cout<<"inconsistent value! expected value:"<<i<<", got value:"<<*res<<endl;
+            success = false;
+          }
+        } else {
+          cout<<"can't pop data"<<endl;
+          success = false;
+        }
+        delete res;
+        res = nullptr;
+      }
+      PRINT_RESULT("queue storing pointer point to int type");
+    }
+
+    number = 1000;
+    { // case 8
+      bool success = true;
+
+      int thread_num = 5;
+      int init_cap = thread_num * number;
+      int before_value = -1, after_value = before_value + thread_num;
+      int* count = new int[number];
+
+
+      for (int t = 0; t < repeat_time; ++t) {
+        memset(count , before_value, sizeof(int) * number);
+        FixSizeLockFreeQueue<int> lf_queue(init_cap);
+        for(int i = 0; i < init_cap; ++i) {
+          if (!lf_queue.Push(i%number)) assert(false && "meeting wrong when pushing data");
+        }
+        assert(lf_queue.Size() == thread_num* number && "wrong size after pushing data");
+
+        std::thread **td = new thread*[thread_num];
+        for (int th_num = 0; th_num< thread_num; ++th_num){
+          td[th_num]= new thread([&lf_queue, &count, number](){
+            int res = -1;
+            while(lf_queue.Pop(res)) {
+              if (res >= number || res < 0) {
+                cout<<"error value"<<endl;
+                assert(false);
+              } else {
+                __sync_fetch_and_add(&count[res], 1);
+              }
+            }
+          });
+        }
+
+        for (int th_num = 0; th_num< thread_num; ++th_num) {(*td[th_num]).join(); delete td[th_num]; }
+        delete[] td;
+        if (!lf_queue.Empty())
+          cout<<"front offset is: "<<lf_queue.front()<<", end offset is: "<<lf_queue.end()<<", written offset is: "<<lf_queue.written_off()<<endl;
+        assert(lf_queue.Empty());
+
+        for (int i = 0; i < number; ++i) {
+          if(count[i] != after_value) {
+            cout<<"lost some data or duplicate some data, the "<<i<<"'s count is:"<<count[i]<<", expected value is:"<<after_value<<endl;
+            success = false;
+          }
+        }
+        if (!success) {
+          cout<<"front offset is: "<<lf_queue.front()<<", end offset is: "<<lf_queue.end()<<endl;
+          break;
+        }
+      }
+      delete[] count;
+      PRINT_RESULT_R("input_all_then_multi-thread_output", repeat_time);
+    }
+
+
+    number = 1000;
+    {   // case 10
+      bool success = true;
+
+      int thread_num = 5;
+      int init_cap = thread_num * number / 2;
+      int before_value = -1, after_value = before_value + thread_num, popped_num;
+      int* count = new int[number];
+      for (int t = 0; t < repeat_time; ++t) {
+        popped_num = 0;
+        memset(count , before_value, sizeof(int) * number);
+        FixSizeLockFreeQueue<int> lf_queue(init_cap);
+
+        thread* td= new thread([&lf_queue, number, thread_num](){
+          for (int time = 0; time < thread_num; ++time ){
+            for(int i = 0; i < number; ++i) {
+              while (!lf_queue.Push(i)){
+                sched_yield();
+              }
+            }
+          }
+        });
+        std::thread **td2 = new thread*[thread_num];
+        for (int th_num = 0; th_num< thread_num; ++th_num){
+          td2[th_num]= new thread([&lf_queue, &count, &popped_num, thread_num, number](){
+            while(popped_num < number*thread_num){
+              int res = -1;
+              while (lf_queue.Pop(res)) {
+                if (res >= number || res < 0) {
+                  cout<<"error value:"<<res<<endl;
+                  //              assert(false);
+                } else {
+                  __sync_fetch_and_add(&count[res], 1);
+                  __sync_fetch_and_add(&popped_num, 1);
+                }
+              }
+              sched_yield();
+            }
+          });
+        }
+
+        td->join();
+        for (int th_num = 0; th_num< thread_num; ++th_num) { (*td2[th_num]).join(); delete td2[th_num]; }
+        delete td;
+        delete[] td2;
+        assert(lf_queue.Empty());
+
+        for (int i = 0; i < number; ++i) {
+          if(count[i] != after_value) {
+            cout<<"lost some data or duplicate some data, the "<<i<<"'s count is:"<<count[i]<<", expected value is:"<<after_value<<endl;
+            success = false;
+          }
+        }
+
+        if (!success) {
+          cout<<"ERROR: front offset is: "<<lf_queue.front()<<", end offset is: "<<lf_queue.end()<<endl;
+          break;
+        }
+      }
+      delete[] count;
+      PRINT_RESULT_R("multi-thread_loop_pushing_and_poping_into_smaller_queue", repeat_time);
+    }
+
+    {
+      // case 10
+      bool success = true;
+
+      int thread_num = 5;
+      int init_cap = thread_num * number / 2;
+      int before_value = -1, after_value = before_value + thread_num, popped_num = 0;
+      int* count = new int[number];
+
+      for (int t = 0; t < repeat_time; ++t) {
+        popped_num = 0;
+        memset(count , before_value, sizeof(int) * number);
+        FixSizeLockFreeQueue<long> lf_queue(init_cap);
+
+        thread* td= new thread([&lf_queue, number, thread_num](){
+          for (int time = 0; time < thread_num; ++time ){
+            for(int i = 0; i < number; ++i) {
+              while (!lf_queue.Push(i)){
+                sched_yield();
+              }
+            }
+          };
+        });
+        std::thread **td2 = new thread*[thread_num];
+        for (int th_num = 0; th_num< thread_num; ++th_num){
+          td2[th_num]= new thread([&lf_queue, &count, &popped_num, thread_num, number](){
+            while(popped_num < number*thread_num){
+              long res = -1;
+              while (lf_queue.Pop(res)) {
+                if (res >= number || res < 0) {
+                  cout<<"error value:"<<res<<endl;
+                  //              assert(false);
+                } else {
+                  __sync_fetch_and_add(&count[res], 1);
+                  __sync_fetch_and_add(&popped_num, 1);
+                }
+              }
+              sched_yield();
+            }
+          });
+        }
+        td->join();
+        for (int th_num = 0; th_num< thread_num; ++th_num) { (*td2[th_num]).join(); delete td2[th_num]; }
+        delete td;
+        delete[] td2;
+        assert(lf_queue.Empty());
+
+        for (int i = 0; i < number; ++i) {
+          if(count[i] != after_value) {
+            cout<<"lost some data or duplicate some data, the "<<i<<"'s count is:"<<count[i]<<", expected value is:"<<after_value<<endl;
+            success = false;
+          }
+        }
+
+        if (!success) {
+          cout<<"ERROR: front offset is: "<<lf_queue.front()<<", end offset is: "<<lf_queue.end()<<endl;
+          break;
+        }
+      }
+      delete[] count;
+      PRINT_RESULT_R("multi-thread_loop_pushing_and_poping_into_smaller_queue_with_long_type", repeat_time);
+    }
+
+    repeat_time = 1000;
+    number = 10000;
+    {
+      bool success = true;
+
+      int thread_num = 5;
+      int init_cap = thread_num * number / 2;
+
+
+      int before_value = -1, after_value = before_value + thread_num, popped_num = 0;
+      int* count = new int[number];
+
+      for (int t = 0; t < repeat_time; ++t) {
+        popped_num = 0;
+        memset(count , before_value, sizeof(int) * number);
+        FixSizeLockFreeQueue<int*> lf_queue(init_cap);
+
+        std::thread* td= new thread([&lf_queue, number, thread_num](){
+          for (int th_num = 0; th_num< thread_num; ++th_num){
+            for(int i = 0; i < number; ++i) {
+              while (!lf_queue.Push(new int(i))){
+                sched_yield();
+              }
+            };
+          };
+        });
+        std::thread **td2 = new thread*[thread_num];
+        for (int th_num = 0; th_num< thread_num; ++th_num){
+          td2[th_num]= new thread([&lf_queue, &count, &popped_num, thread_num, number](){
+            while(popped_num < number*thread_num){
+              int* res = nullptr;
+              while (lf_queue.Pop(res)) {
+                if (*res >= number || *res < 0) {
+                  cout<<"error value:"<<*res<<endl;
+                  //              assert(false);
+                } else {
+                  __sync_fetch_and_add(&count[*res], 1);
+                  __sync_fetch_and_add(&popped_num, 1);
+                }
+                delete res;
+                res = nullptr;
+              }
+              sched_yield();
+            }
+          });
+        }
+
+        td->join();
+        for (int th_num = 0; th_num< thread_num; ++th_num) { (*td2[th_num]).join(); delete td2[th_num]; }
+        delete td;
+        delete[] td2;
+        assert(lf_queue.Empty());
+
+        for (int i = 0; i < number; ++i) {
+          if(count[i] != after_value) {
+            cout<<"lost some data or duplicate some data, the "<<i<<"'s count is:"<<count[i]<<", expected value is:"<<after_value<<endl;
+            success = false;
+          }
+        }
+
+        if (!success) {
+          cout<<"ERROR: front offset is: "<<lf_queue.front()<<", end offset is: "<<lf_queue.end()<<endl;
+          break;
+        }
+      }
+      delete[] count;
+      PRINT_RESULT_R("multi-thread_loop_pushing_and_poping_into_smaller_queue_with_int_pointer_type", repeat_time);
+
+    }
+
+
 
   cout<<"tested "<<case_id<<" cases"<<endl;
   if (failed_case_num == 0) {
