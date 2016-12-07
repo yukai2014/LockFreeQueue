@@ -34,6 +34,8 @@
 #include <atomic>
 #include <iostream>
 #include <malloc.h>
+#include <pthread.h>
+#include <unistd.h>
 #include <memory>
 #include <string>
 #include <thread>
@@ -88,6 +90,7 @@ class FixSizeLockFreeQueue {
         }
         return true;
       }
+      usleep(1);
     }
   }
 
@@ -97,7 +100,7 @@ class FixSizeLockFreeQueue {
     while (true) {
       int64_t end = end_offset_;
       if (end >= front_offset_) return false;
-      if (end >= written_offset_) {sched_yield(); continue;};
+      if (end >= written_offset_) {usleep(1); continue;};
 
       /*
        * must get data before CAS operation,
@@ -107,7 +110,8 @@ class FixSizeLockFreeQueue {
       if (CAS(end_offset_, end, end + 1)) {
         return true;
       }
-      sched_yield();
+      /*sched_yield();*/
+      usleep(1);
     }
   }
 
@@ -154,7 +158,10 @@ class SingleProducerQueue : public FixSizeLockFreeQueue<T> {
       if (CAS((LFQueue::end_offset_), end, end + 1)) {
         return true;
       }
-      sched_yield();
+      //      static timespec fifth_ns{0, 500};
+      //      nanosleep(&fifth_ns, 0);
+      usleep(1);    // better performance than sched_yield() and 50ns sleep and 500ns sleep, which confuses me
+      //      sched_yield();
     }
   }
 };
