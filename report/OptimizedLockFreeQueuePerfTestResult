@@ -1,0 +1,182 @@
+The performance results of LockFreeQueue in all cases win STLQueueWithSpinLock!!!
+
+with params: capacity-10000, operation time-100000, producers num-1, consumer num-1
+STLQueueWithLock: 716.851
+LockFreeQueue: 838.199
+SingleProducerQueue: 450.367
+only new and delete: 1823.84
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-1, consumer num-2
+STLQueueWithLock: 1106.65
+LockFreeQueue: 936.068
+SingleProducerQueue: 386.808
+only new and delete: 1815.13
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-1, consumer num-3
+STLQueueWithLock: 1343.82
+LockFreeQueue: 872.709
+SingleProducerQueue: 378.095
+only new and delete: 1888.89
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-1, consumer num-4
+STLQueueWithLock: 1862.05
+LockFreeQueue: 876.372
+SingleProducerQueue: 398.378
+only new and delete: 2522.46
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-1, consumer num-5
+STLQueueWithLock: 2301.46
+LockFreeQueue: 889.678
+SingleProducerQueue: 400.214
+only new and delete: 2857.64
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-1, consumer num-6
+STLQueueWithLock: 2666.61
+LockFreeQueue: 893.075
+SingleProducerQueue: 400.558
+only new and delete: 3223.41
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-1, consumer num-7
+STLQueueWithLock: 2653.69
+LockFreeQueue: 884.699
+SingleProducerQueue: 405.239
+only new and delete: 3661.85
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-1, consumer num-8
+STLQueueWithLock: 2988.12
+LockFreeQueue: 919.175
+SingleProducerQueue: 402.327
+only new and delete: 4250.27
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-1, consumer num-9
+STLQueueWithLock: 3247.77
+LockFreeQueue: 905.141
+SingleProducerQueue: 402.691
+only new and delete: 4413.56
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-1, consumer num-10
+STLQueueWithLock: 3500.55
+LockFreeQueue: 900.871
+SingleProducerQueue: 395.085
+only new and delete: 4792.62
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-2, consumer num-1
+STLQueueWithLock: 1638.49
+LockFreeQueue: 1744.89
+only new and delete: 2119.38
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-2, consumer num-2
+STLQueueWithLock: 2406.44
+LockFreeQueue: 1768.97
+only new and delete: 2212.69
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-2, consumer num-3
+STLQueueWithLock: 2914.99
+LockFreeQueue: 1708.45
+only new and delete: 2630.62
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-2, consumer num-4
+STLQueueWithLock: 3944.83
+LockFreeQueue: 1710.41
+only new and delete: 3182.33
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-2, consumer num-5
+STLQueueWithLock: 4624.39
+LockFreeQueue: 1818.64
+only new and delete: 3572.2
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-2, consumer num-6
+STLQueueWithLock: 5117.79
+LockFreeQueue: 1901.53
+only new and delete: 3851.08
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-2, consumer num-7
+STLQueueWithLock: 5748.53
+LockFreeQueue: 2019.3
+only new and delete: 4503.89
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-2, consumer num-8
+STLQueueWithLock: 6313.31
+LockFreeQueue: 2357.13
+only new and delete: 4884.7
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-3, consumer num-1
+STLQueueWithLock: 2854.52
+LockFreeQueue: 2623.85
+only new and delete: 3723.94
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-3, consumer num-2
+STLQueueWithLock: 4046.01
+LockFreeQueue: 2583.67
+only new and delete: 3602.17
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-3, consumer num-3
+STLQueueWithLock: 4793.48
+LockFreeQueue: 2675.02
+only new and delete: 3249.29
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-3, consumer num-4
+STLQueueWithLock: 6633.44
+LockFreeQueue: 2720.49
+only new and delete: 3601.74
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-3, consumer num-5
+STLQueueWithLock: 7019.29
+LockFreeQueue: 2902.68
+only new and delete: 3741.47
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-3, consumer num-6
+STLQueueWithLock: 7769.43
+LockFreeQueue: 3156.13
+only new and delete: 4530.14
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-4, consumer num-1
+STLQueueWithLock: 4229.53
+LockFreeQueue: 3458.19
+only new and delete: 5096.47
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-4, consumer num-2
+STLQueueWithLock: 5608.55
+LockFreeQueue: 3714.11
+only new and delete: 4879.68
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-4, consumer num-3
+STLQueueWithLock: 7075.62
+LockFreeQueue: 3729.84
+only new and delete: 4519.33
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-4, consumer num-4
+STLQueueWithLock: 8757.69
+LockFreeQueue: 3925.18
+only new and delete: 4210.19
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-4, consumer num-5
+STLQueueWithLock: 9565.43
+LockFreeQueue: 3987.14
+only new and delete: 4320.03
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-4, consumer num-6
+STLQueueWithLock: 10252.8
+LockFreeQueue: 4237.68
+only new and delete: 4592.16
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-5, consumer num-1
+STLQueueWithLock: 6075.14
+LockFreeQueue: 4522.06
+only new and delete: 6273.08
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-5, consumer num-2
+STLQueueWithLock: 7702.74
+LockFreeQueue: 4735.09
+only new and delete: 6072.28
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-5, consumer num-3
+STLQueueWithLock: 9210
+LockFreeQueue: 5000.32
+only new and delete: 5392.45
+-----------------------------------------------------
+with params: capacity-10000, operation time-100000, producers num-5, consumer num-4
+STLQueueWithLock: 11204.7
+LockFreeQueue: 5066.11
+only new and delete: 5127.6
+
