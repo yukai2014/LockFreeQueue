@@ -119,9 +119,9 @@ class FixSizeLockFreeQueue {
 
  protected:
   const int64_t capacity_;
-  int64_t front_offset_;   // the offset of the next data to store
-  int64_t end_offset_;     // the offset of the next stored data to read
-  int64_t written_offset_;  // the offset of last data stored
+  volatile int64_t front_offset_;   // the offset of the next data to store
+  volatile int64_t end_offset_;     // the offset of the next stored data to read
+  volatile int64_t written_offset_;  // the offset of last data stored
   unique_ptr<T[]> buffer_;
 
 };
@@ -136,8 +136,8 @@ class SingleProducerQueue : public FixSizeLockFreeQueue<T> {
   inline bool Push(const T& t) {
     if (LFQueue::front_offset_ - LFQueue::end_offset_ + 1 > LFQueue::capacity_ ) return false;
 
-    int front = __sync_fetch_and_add(&(LFQueue::front_offset_), 1);
-    LFQueue::buffer_[front%LFQueue::capacity_] = t;
+    LFQueue::buffer_[LFQueue::front_offset_%LFQueue::capacity_] = t;
+    ++LFQueue::front_offset_;
     return true;
   }
 

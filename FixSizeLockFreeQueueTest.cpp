@@ -226,7 +226,7 @@ int main(){
       std::thread **td = new thread*[thread_num];
       for (int th_num = 0; th_num< thread_num; ++th_num){
         td[th_num]= new thread([&lf_queue, number](){
-          for(int i = 0; i < number; ++i) {
+          for(int i = number-1; i >= 0; --i) {
             if (!lf_queue.Push(i)) assert(false && "meeting wrong when pushing data");
           };
         });
@@ -890,7 +890,7 @@ int main(){
               while (lf_queue.Pop(res)) {
                 if (res >= number || res < 0) {
                   cout<<"error value:"<<res<<endl;
-                  //              assert(false);
+                  assert(false);
                 } else {
                   __sync_fetch_and_add(&count[res], 1);
                   __sync_fetch_and_add(&popped_num, 1);
@@ -937,15 +937,7 @@ int main(){
         memset(count , before_value, sizeof(int) * number);
         FixSizeLockFreeQueue<long> lf_queue(init_cap);
 
-        thread* td= new thread([&lf_queue, number, thread_num](){
-          for (int time = 0; time < thread_num; ++time ){
-            for(int i = 0; i < number; ++i) {
-              while (!lf_queue.Push(i)){
-                sched_yield();
-              }
-            }
-          };
-        });
+
         std::thread **td2 = new thread*[thread_num];
         for (int th_num = 0; th_num< thread_num; ++th_num){
           td2[th_num]= new thread([&lf_queue, &count, &popped_num, thread_num, number](){
@@ -954,7 +946,7 @@ int main(){
               while (lf_queue.Pop(res)) {
                 if (res >= number || res < 0) {
                   cout<<"error value:"<<res<<endl;
-                  //              assert(false);
+                  assert(false);
                 } else {
                   __sync_fetch_and_add(&count[res], 1);
                   __sync_fetch_and_add(&popped_num, 1);
@@ -964,6 +956,15 @@ int main(){
             }
           });
         }
+        thread* td= new thread([&lf_queue, number, thread_num](){
+          for (int time = 0; time < thread_num; ++time ){
+            for(int i = 0; i < number; ++i) {
+              while (!lf_queue.Push(i)){
+                sched_yield();
+              }
+            }
+          };
+        });
         td->join();
         for (int th_num = 0; th_num< thread_num; ++th_num) { (*td2[th_num]).join(); delete td2[th_num]; }
         delete td;
@@ -1003,15 +1004,7 @@ int main(){
         memset(count , before_value, sizeof(int) * number);
         FixSizeLockFreeQueue<int*> lf_queue(init_cap);
 
-        std::thread* td= new thread([&lf_queue, number, thread_num](){
-          for (int th_num = 0; th_num< thread_num; ++th_num){
-            for(int i = 0; i < number; ++i) {
-              while (!lf_queue.Push(new int(i))){
-                sched_yield();
-              }
-            };
-          };
-        });
+
         std::thread **td2 = new thread*[thread_num];
         for (int th_num = 0; th_num< thread_num; ++th_num){
           td2[th_num]= new thread([&lf_queue, &count, &popped_num, thread_num, number](){
@@ -1032,7 +1025,15 @@ int main(){
             }
           });
         }
-
+        std::thread* td= new thread([&lf_queue, number, thread_num](){
+          for (int th_num = 0; th_num< thread_num; ++th_num){
+            for(int i = 0; i < number; ++i) {
+              while (!lf_queue.Push(new int(i))){
+                sched_yield();
+              }
+            };
+          };
+        });
         td->join();
         for (int th_num = 0; th_num< thread_num; ++th_num) { (*td2[th_num]).join(); delete td2[th_num]; }
         delete td;
